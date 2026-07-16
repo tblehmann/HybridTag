@@ -66,7 +66,7 @@
     margin: 0 auto;
     min-height: 100vh;
     display: flex;
-    background: var(--paper);
+    background: transparent;   /* transparent so the slot cuts through to the map */
     box-shadow: 0 0 40px rgba(43,51,80,.18);
   }
 
@@ -93,14 +93,18 @@
   .sheet {
     flex: 1 1 auto;
     min-width: 0;
-    background: var(--paper);
+    background: transparent;
   }
+  /* Every section paints its own paper; the map slot stays transparent so the
+     full-bleed map shows through it as the sheet slides over. */
+  .meta, .serialhead, .address, .headblock,
+  .figure .caption, .figure .coords,
+  .specs, .foot { background: var(--paper); }
 
-  /* ---------- Intro: map fills the screen, sheet overlays it ---------- */
-  #intro { position: fixed; inset: 0; z-index: 500; background: #e2e2e2; }
+  /* ---------- Intro: tag drops in over a neutral backdrop ---------- */
   .shell {
     position: relative; z-index: 700;
-    transition: transform 650ms cubic-bezier(.16,.84,.28,1);
+    transition: transform 3.5s cubic-bezier(.16,.84,.28,1);
     will-change: transform;
   }
   /* Tag starts above the screen and slides down over the map like a dropped card */
@@ -175,12 +179,18 @@
     display: flex; align-items: center; justify-content: space-between;
     gap: 10px; padding: 10px 16px; border-bottom: var(--bw) solid var(--line);
   }
-  #map { width: 100%; height: 100%; background: #e2e2e2; }
-  #map-slot {
-    height: 220px; background: #e2e2e2;
-    transition: opacity 250ms linear;
+  /* Map loads full-bleed behind the sheet; the sheet slides over and frames it */
+  #map {
+    position: fixed; inset: 0; z-index: 1;
+    background: #e2e2e2;
   }
-  #map-slot.pending { opacity: 0; }
+  /* Once the sheet has landed, the map docks into the slot and flows with the page */
+  #map.docked { position: absolute; inset: 0; z-index: auto; }
+  /* Transparent window in the sheet the map shows through / docks into */
+  #map-slot {
+    position: relative; overflow: hidden;
+    height: 220px; background: transparent;
+  }
   .figure .coords {
     display: flex; justify-content: space-between; gap: 12px;
     padding: 9px 16px;
@@ -262,7 +272,7 @@
 </style>
 </head>
 <body>
-  <main class="shell">
+  <main class="shell offstage">
 
     <!-- Sheet -->
     <div class="sheet">
@@ -329,24 +339,21 @@
     </div>
   </main>
 
-  <!-- Intro layer: the map opens full-screen here, then docks into Fig. 01 -->
-  <div id="intro" aria-hidden="true">
-    <div id="map"></div>
-  </div>
+  <!-- Full-bleed map: loads behind the sheet, docks into Fig. 01 once the sheet lands -->
+  <div id="map"></div>
 
   <script>
     const lat = 36.9642, lng = -122.0189;
     const SITE = [lat, lng];
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    const intro = document.getElementById('intro');
-    const mapEl = document.getElementById('map');
     const slot  = document.getElementById('map-slot');
+    const mapEl = document.getElementById('map');
     const shell = document.querySelector('.shell');
 
     const map = L.map('map', {
       zoomControl: false, scrollWheelZoom: false, attributionControl: true,
-    }).setView(reducedMotion ? SITE : [37.2, -120.2], reducedMotion ? 15 : 6);
+    }).setView(SITE, 15);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 20,
@@ -359,44 +366,59 @@
     });
     L.marker([lat,lng], {icon: pin}).addTo(map).bindPopup('The Dipper · 1924–1968');
 
-    /* ---- Intro choreography: full-screen map → sheet overlays → map docks ---- */
+    /* ---- Intro choreography: full-bleed map → sheet slides over → map docks in ----
+       The map loads full-bleed. We pan it so the site sits exactly under the slot's
+       final on-screen position, so when the sheet finishes sliding down the map is
+       already framed in Fig. 01 — then we dock the node into the slot (seamless,
+       since a 220px window into a z15 map == a standalone 220px z15 map). */
+    function alignMapToSlot() {
+      const rect = slot.getBoundingClientRect();
+      const shellH = shell.offsetHeight;                 // sheet is parked one height up
+      const slotCenter = L.point(
+        rect.left + rect.width / 2,
+        rect.top + shellH + rect.height / 2              // where the slot lands
+      );
+      const mapCenter = map.getSize().divideBy(2);
+      map.setView(SITE, 15, { animate: false });
+      map.panBy(mapCenter.subtract(slotCenter), { animate: false });
+    }
+
     let docked = false;
     function dockMap() {
       if (docked) return;
       docked = true;
-      slot.appendChild(mapEl);
-      intro.remove();
       document.body.classList.remove('intro-lock');
-      mapEl.style.pointerEvents = '';
+      slot.appendChild(mapEl);
+      mapEl.classList.add('docked');
+      slot.classList.remove('pending');
       map.invalidateSize();
       map.setView(SITE, 15, { animate: false });
       L.control.zoom({ position: 'topleft' }).addTo(map);
-      slot.classList.remove('pending');
     }
 
     if (reducedMotion) {
+      shell.classList.remove('offstage');
       dockMap();
     } else {
       document.body.classList.add('intro-lock');
-      shell.classList.add('offstage');
-      mapEl.style.pointerEvents = 'none';
+      alignMapToSlot();   // frame the site under the slot's landing spot
 
-      setTimeout(() => map.flyTo(SITE, 15, { duration: 2 }), 350);
-
-      map.once('moveend', () => {
-        if (docked) return;
+      // Sheet slides down over the full-bleed map
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        shell.classList.remove('offstage');
         runSerialDecode();
-        requestAnimationFrame(() => shell.classList.remove('offstage'));
-        const fallback = setTimeout(dockMap, 700);
-        shell.addEventListener('transitionend', function onEnd(e) {
-          if (e.propertyName !== 'transform') return;
-          shell.removeEventListener('transitionend', onEnd);
-          clearTimeout(fallback);
-          dockMap();
-        });
+      }));
+
+      // Once the sheet lands, dock the framed map into the slot
+      const fallback = setTimeout(dockMap, 5400);
+      shell.addEventListener('transitionend', function onEnd(e) {
+        if (e.propertyName !== 'transform') return;
+        shell.removeEventListener('transitionend', onEnd);
+        clearTimeout(fallback);
+        dockMap();
       });
 
-      // A tap anywhere skips straight to the finished sheet
+      // A tap anywhere skips straight to the finished record
       window.addEventListener('pointerdown', () => {
         if (docked) return;
         shell.style.transition = 'none';
