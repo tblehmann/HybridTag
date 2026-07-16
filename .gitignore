@@ -1,3 +1,4 @@
 *.md
 /Images/
+/.Obsidian/
 *.DS_Store
