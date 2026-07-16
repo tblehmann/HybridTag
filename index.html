@@ -353,6 +353,8 @@
 
     const map = L.map('map', {
       zoomControl: false, scrollWheelZoom: false, attributionControl: true,
+      dragging: false, touchZoom: false, doubleClickZoom: false,
+      boxZoom: false, keyboard: false, tap: false,
     }).setView(SITE, 15);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
@@ -393,7 +395,6 @@
       slot.classList.remove('pending');
       map.invalidateSize();
       map.setView(SITE, 15, { animate: false });
-      L.control.zoom({ position: 'topleft' }).addTo(map);
     }
 
     if (reducedMotion) {
