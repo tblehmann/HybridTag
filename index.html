@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#3c496b" />
+<title>The Dipper — TagAPP</title>
+
+<!-- Leaflet (map) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin="anonymous" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin="anonymous"></script>
+
+<style>
+  /* ---------- Fonts ---------- */
+  @font-face {
+    font-family: "Cooper Hewitt";
+    src: url("fonts/CooperHewitt-Bold.woff2") format("woff2"),
+         url("fonts/CooperHewitt-Bold.woff")  format("woff");
+    font-weight: 600; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: "Cooper Hewitt Heavy";
+    src: url("fonts/CooperHewitt-Heavy.woff2") format("woff2"),
+         url("fonts/CooperHewitt-Heavy.woff")  format("woff");
+    font-weight: 800; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: "Cooper Hewitt Book";
+    src: url("fonts/CooperHewitt-Book.woff2") format("woff2"),
+         url("fonts/CooperHewitt-Book.woff")  format("woff");
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+
+  /* ---------- Tokens ---------- */
+  :root {
+    --paper: #ededed;
+    --navy:  #3c496b;   /* secondary — rail, table header, rules, ink */
+    --ink:   #2b3350;   /* text */
+    --amber: #3c496b;   /* highlight */
+    --line:  #3c496b;   /* hairline rules */
+    --title:   "Cooper Hewitt", system-ui, sans-serif;
+    --display: "Cooper Hewitt Heavy", "Cooper Hewitt", system-ui, sans-serif;
+    --body:    "Cooper Hewitt Book", "Cooper Hewitt", system-ui, sans-serif;
+    --bw: 1.5px;        /* datasheet hairline width */
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--body);
+    color: var(--ink);
+    background: #d9d9d9;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ---------- Shell: rail + sheet ---------- */
+  .shell {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    background: var(--paper);
+    box-shadow: 0 0 40px rgba(43,51,80,.18);
+  }
+
+  /* Left navy rail with rotated label */
+  .rail {
+    flex: 0 0 46px;
+    background: var(--navy);
+    color: var(--paper);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: calc(env(safe-area-inset-top) + 16px) 0 18px;
+  }
+  .rail-mid { flex: 1; display: grid; place-items: center; }
+  .rail-label {
+    writing-mode: vertical-rl; transform: rotate(180deg);
+    font-family: var(--display); font-weight: 800;
+    text-transform: uppercase; letter-spacing: .22em;
+    font-size: 16px; white-space: nowrap;
+  }
+
+  /* Sheet = framed content column */
+  .sheet {
+    flex: 1 1 auto;
+    min-width: 0;
+    background: var(--paper);
+  }
+
+  /* ---------- Intro: map fills the screen, sheet overlays it ---------- */
+  #intro { position: fixed; inset: 0; z-index: 500; background: #e2e2e2; }
+  .shell {
+    position: relative; z-index: 700;
+    transition: opacity 500ms ease;
+  }
+  .shell.offstage { opacity: 0; pointer-events: none; }
+  body.intro-lock { overflow: hidden; }
+
+  /* Shared caps label */
+  .lbl {
+    font-family: var(--title); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .16em;
+    font-size: 10px; color: var(--ink);
+  }
+  .lbl.amber { color: var(--amber); }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- Meta bar ---------- */
+  .meta {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px;
+    padding: 11px 16px;
+    border-bottom: var(--bw) solid var(--line);
+  }
+  .meta .serial { white-space: nowrap; }
+
+  /* ---------- Serial header ---------- */
+  .serialhead { padding: 18px 16px 17px; border-bottom: var(--bw) solid var(--line); }
+  .serialhead .eyebrow { display: block; margin-bottom: 9px; }
+  .serialhead .no {
+    font-family: var(--display); font-weight: 800;
+    font-size: clamp(30px, 9.5vw, 42px);
+    line-height: 1; letter-spacing: -.01em;
+    color: var(--ink); font-variant-numeric: tabular-nums;
+  }
+  /* NFC scan moment — unresolved characters sit at low ink until they lock */
+  .serialhead .no .sn-char { opacity: .35; transition: opacity 120ms linear; }
+  .serialhead .no .sn-char.locked { opacity: 1; }
+
+  /* ---------- Address header ---------- */
+  .address { padding: 16px 16px 15px; border-bottom: var(--bw) solid var(--line); }
+  .address .eyebrow { display: block; margin-bottom: 8px; }
+  .address .street {
+    font-family: var(--display); font-weight: 800;
+    font-size: 19px; line-height: 1.12; color: var(--ink);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .address .city {
+    font-family: var(--title); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .12em;
+    font-size: 11px; color: var(--navy);
+    margin: 6px 0 0 26px;
+  }
+
+  /* ---------- Headline block ---------- */
+  .headblock { padding: 20px 16px 18px; border-bottom: var(--bw) solid var(--line); }
+  .headline {
+    font-family: var(--display); font-weight: 800;
+    font-size: clamp(32px, 9vw, 42px);
+    line-height: 1.0; letter-spacing: -.025em;
+    color: var(--ink); margin: 0 0 14px;
+  }
+  .headline .reg {
+    color: var(--amber); font-size: .42em;
+    vertical-align: .85em; margin-left: .04em;
+  }
+  .lede {
+    font-family: var(--body); font-size: 14.5px;
+    line-height: 1.5; color: var(--ink); margin: 0; max-width: 40ch;
+  }
+
+  /* ---------- Map figure ---------- */
+  .figure { border-bottom: var(--bw) solid var(--line); }
+  .figure .caption {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 10px 16px; border-bottom: var(--bw) solid var(--line);
+  }
+  #map { width: 100%; height: 100%; background: #e2e2e2; }
+  #map-slot {
+    height: 220px; background: #e2e2e2;
+    transition: opacity 250ms linear;
+  }
+  #map-slot.pending { opacity: 0; }
+  .figure .coords {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 9px 16px;
+  }
+
+  /* ---------- Spec table ---------- */
+  .specs { border-bottom: var(--bw) solid var(--line); }
+  .specs .head {
+    display: grid; grid-template-columns: 40% 1fr;
+    background: var(--navy); color: var(--paper);
+  }
+  .specs .head span {
+    font-family: var(--title); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .12em;
+    font-size: 12px; padding: 11px 16px;
+  }
+  .specs .head span + span { border-left: var(--bw) solid rgba(237,237,237,.25); }
+  .specs .row {
+    display: grid; grid-template-columns: 40% 1fr;
+    border-bottom: 1px solid rgba(60,73,107,.28);
+  }
+  .specs .row:last-child { border-bottom: none; }
+  .specs .row .k {
+    font-family: var(--title); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .05em;
+    font-size: clamp(13px, 4vw, 17px); color: var(--navy);
+    padding: 13px 16px;
+    border-right: 1px solid rgba(60,73,107,.28);
+  }
+  .specs .row .v {
+    font-family: var(--body); font-size: 14px; color: var(--ink);
+    padding: 14px 16px;
+  }
+
+  /* Lifespan bar — construction → demolition */
+  .lifebar {
+    display: block; height: 3px; margin-top: 8px;
+    background: rgba(60,73,107,.22);
+  }
+  .lifebar .fill {
+    display: block; height: 100%; width: 0;
+    background: var(--navy);
+    transition: width 900ms 150ms linear;
+  }
+
+  /* ---------- Footer ---------- */
+  .foot {
+    padding: 20px 16px calc(env(safe-area-inset-bottom) + 24px);
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+  }
+  .foot .big {
+    font-family: var(--display); font-weight: 800;
+    font-size: 23px; line-height: 1.02; color: var(--ink); margin: 0 0 6px;
+  }
+  .foot .sub {
+    font-family: var(--body); font-size: 11px; color: var(--navy);
+  }
+
+  /* Leaflet tweaks */
+  .leaflet-container { font-family: var(--body); background: #e2e2e2; }
+  .leaflet-popup-content-wrapper { border-radius: 0; font-family: var(--title); font-weight: 600; }
+  .leaflet-popup-content { font-size: 12px; }
+  .leaflet-bar, .leaflet-touch .leaflet-bar {
+    border: var(--bw) solid var(--navy); border-radius: 0; box-shadow: none;
+  }
+  .leaflet-bar a, .leaflet-touch .leaflet-bar a {
+    border-radius: 0; color: var(--navy);
+    font-family: var(--title); font-weight: 600;
+    border-bottom: 1px solid rgba(60,73,107,.28);
+  }
+  .leaflet-bar a:last-child, .leaflet-touch .leaflet-bar a:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+  <main class="shell">
+
+    <!-- Left rail -->
+    <aside class="rail" aria-hidden="true">
+      <div class="rail-mid"><div class="rail-label">Building Record</div></div>
+    </aside>
+
+    <!-- Sheet -->
+    <div class="sheet">
+
+      <div class="meta">
+        <span class="lbl">TagApp&nbsp;/&nbsp;Field Archive</span>
+        <span class="lbl num">Rec&nbsp;01&nbsp;/&nbsp;50</span>
+      </div>
+
+      <section class="serialhead">
+        <span class="lbl eyebrow">Board Serial No.</span>
+        <div class="no">TAG-CA-2B9C74</div>
+      </section>
+
+      <section class="address">
+        <span class="lbl amber eyebrow">Location</span>
+        <div class="street">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#3c496b" stroke-width="2.2"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          400 Beach Street
+        </div>
+        <div class="city">Santa Cruz, California</div>
+      </section>
+
+      <section class="headblock">
+        <h1 class="headline">Santa Cruz Boardwalk Coaster<span class="reg">&#174;</span></h1>
+        <p class="lede">A Douglas-fir trestle roller coaster that rattled along the
+          Monterey Bay shoreline for four decades before it was dismantled.</p>
+      </section>
+
+      <section class="figure">
+        <div class="caption">
+          <span class="lbl">Fig.&nbsp;01</span>
+          <span class="lbl">Site Location</span>
+        </div>
+        <div id="map-slot" class="pending"></div>
+        <div class="coords">
+          <span class="lbl num">Lat 36.9642</span>
+          <span class="lbl num">Lng −122.0189</span>
+        </div>
+      </section>
+
+      <section class="specs">
+        <div class="head"><span>Spec</span><span>Record</span></div>
+        <div class="row"><span class="k">Type</span><span class="v">Wooden Roller Coaster</span></div>
+        <div class="row"><span class="k">Material</span><span class="v">Douglas fir trestle &amp; track</span></div>
+        <div class="row"><span class="k">Built</span><span class="v num">June 20, 1924</span></div>
+        <div class="row"><span class="k">Demolished</span><span class="v num">March 11, 1968</span></div>
+        <div class="row"><span class="k">Lifespan</span><span class="v num">44 years · 1924–1968<span class="lifebar"><span class="fill"></span></span></span></div>
+      </section>
+
+      <footer class="foot">
+        <div>
+          <p class="big">Wood Structure Archive</p>
+          <p class="sub">California timber structures · tap-to-scan record</p>
+        </div>
+      </footer>
+
+    </div>
+  </main>
+
+  <!-- Intro layer: the map opens full-screen here, then docks into Fig. 01 -->
+  <div id="intro" aria-hidden="true">
+    <div id="map"></div>
+  </div>
+
+  <script>
+    const lat = 36.9642, lng = -122.0189;
+    const SITE = [lat, lng];
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const intro = document.getElementById('intro');
+    const mapEl = document.getElementById('map');
+    const slot  = document.getElementById('map-slot');
+    const shell = document.querySelector('.shell');
+
+    const map = L.map('map', {
+      zoomControl: false, scrollWheelZoom: false, attributionControl: true,
+    }).setView(reducedMotion ? SITE : [37.2, -120.2], reducedMotion ? 15 : 6);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 20,
+    }).addTo(map);
+
+    const pin = L.divIcon({
+      className: 'tag-pin',
+      html: '<div style="width:18px;height:18px;background:#3c496b;border:3px solid #ffffff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(43,51,80,.5)"></div>',
+      iconSize: [18,18], iconAnchor: [9,18],
+    });
+    L.marker([lat,lng], {icon: pin}).addTo(map).bindPopup('The Dipper · 1924–1968');
+
+    /* ---- Intro choreography: full-screen map → sheet overlays → map docks ---- */
+    let docked = false;
+    function dockMap() {
+      if (docked) return;
+      docked = true;
+      slot.appendChild(mapEl);
+      intro.remove();
+      document.body.classList.remove('intro-lock');
+      mapEl.style.pointerEvents = '';
+      map.invalidateSize();
+      map.setView(SITE, 15, { animate: false });
+      L.control.zoom({ position: 'topleft' }).addTo(map);
+      slot.classList.remove('pending');
+    }
+
+    if (reducedMotion) {
+      dockMap();
+    } else {
+      document.body.classList.add('intro-lock');
+      shell.classList.add('offstage');
+      mapEl.style.pointerEvents = 'none';
+
+      setTimeout(() => map.flyTo(SITE, 15, { duration: 2 }), 350);
+
+      map.once('moveend', () => {
+        if (docked) return;
+        runSerialDecode();
+        requestAnimationFrame(() => shell.classList.remove('offstage'));
+        const fallback = setTimeout(dockMap, 700);
+        shell.addEventListener('transitionend', function onEnd(e) {
+          if (e.propertyName !== 'opacity') return;
+          shell.removeEventListener('transitionend', onEnd);
+          clearTimeout(fallback);
+          dockMap();
+        });
+      });
+
+      // A tap anywhere skips straight to the finished sheet
+      window.addEventListener('pointerdown', () => {
+        if (docked) return;
+        shell.style.transition = 'none';
+        shell.classList.remove('offstage');
+        runSerialDecode();
+        dockMap();
+      }, { once: true });
+    }
+
+    /* ---- NFC scan moment: serial resolves character by character ---- */
+    let decodeStarted = false;
+    function runSerialDecode() {
+      if (decodeStarted) return;
+      decodeStarted = true;
+      const el = document.querySelector('.serialhead .no');
+      if (!el || reducedMotion) return;
+
+      const finalText = el.textContent.trim();
+      const CHARSET = '0123456789ABCDEF';
+      el.textContent = '';
+      const spans = finalText.split('').map(ch => {
+        const s = document.createElement('span');
+        s.className = 'sn-char' + (ch === '-' ? ' locked' : '');
+        s.textContent = ch;
+        el.appendChild(s);
+        return s;
+      });
+
+      const live = spans.filter(s => s.textContent !== '-');
+      const finals = finalText.split('').filter(ch => ch !== '-');
+      let locked = 0;
+
+      const scramble = setInterval(() => {
+        for (let i = locked; i < live.length; i++) {
+          live[i].textContent = CHARSET[Math.floor(Math.random() * CHARSET.length)];
+        }
+      }, 45);
+
+      const lock = setInterval(() => {
+        live[locked].textContent = finals[locked];
+        live[locked].classList.add('locked');
+        locked++;
+        if (locked >= live.length) { clearInterval(lock); clearInterval(scramble); }
+      }, 110);
+    }
+
+    /* ---- Lifespan bar fills when the spec table scrolls into view ---- */
+    (function () {
+      const fill = document.querySelector('.lifebar .fill');
+      if (!fill) return;
+      if (reducedMotion || !('IntersectionObserver' in window)) {
+        fill.style.width = '100%';
+        return;
+      }
+      const io = new IntersectionObserver((entries) => {
+        if (entries.some(e => e.isIntersecting)) {
+          fill.style.width = '100%';
+          io.disconnect();
+        }
+      }, { threshold: 0.6 });
+      io.observe(fill.parentElement);
+    })();
+  </script>
+</body>
+</html>
