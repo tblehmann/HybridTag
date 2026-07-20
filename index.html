@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<meta name="theme-color" content="#3c496b" />
+<meta name="theme-color" content="#ffffff" />
 <title>The Dipper — TagAPP</title>
 
 <!-- Leaflet (map) -->
@@ -34,18 +34,35 @@
          url("fonts/CooperHewitt-Book.woff")  format("woff");
     font-weight: 400; font-style: normal; font-display: swap;
   }
+  /* Light — the standard text weight across the whole sheet.
+     Range 100 900 so any inherited font-weight resolves to this face (no faux bold). */
+  @font-face {
+    font-family: "Cooper Hewitt Light";
+    src: url("fonts/CooperHewitt-Light.woff2") format("woff2"),
+         url("fonts/CooperHewitt-Light.woff")  format("woff");
+    font-weight: 100 900; font-style: normal; font-display: swap;
+  }
+  /* Semibold — reserved for the one main title. */
+  @font-face {
+    font-family: "Cooper Hewitt Semibold";
+    src: url("fonts/CooperHewitt-Semibold.woff2") format("woff2"),
+         url("fonts/CooperHewitt-Semibold.woff")  format("woff");
+    font-weight: 100 900; font-style: normal; font-display: swap;
+  }
 
   /* ---------- Tokens ---------- */
   :root {
-    --paper: #ededed;
-    --navy:  #6586ad;   /* secondary — rail, table header, rules, ink */
-    --ink:   #3f3b3c;   /* text */
-    --amber: #3f3b3c;   /* highlight */
-    --line:  #3f3b3c;   /* hairline rules */
-    --titleYellow: #db951d; /* main titles */
-    --title:   "Cooper Hewitt", system-ui, sans-serif;
-    --display: "Cooper Hewitt Heavy", "Cooper Hewitt", system-ui, sans-serif;
-    --body:    "Cooper Hewitt Book", "Cooper Hewitt", system-ui, sans-serif;
+    --paper: #ffffff;   /* white background everywhere */
+    --navy:  #7F9ABA;   /* single ink — every rule, border, accent */
+    --ink:   #7F9ABA;   /* text — one colour for the whole sheet */
+    --amber: #7F9ABA;   /* highlight (repointed to ink) */
+    --line:  #7F9ABA;   /* hairline rules */
+    --titleYellow: #db951d; /* map pin accent only */
+    /* Hierarchy comes from weight, not colour: Light is standard, Semibold is the main title. */
+    --title:   "Cooper Hewitt Light", system-ui, sans-serif;
+    --display: "Cooper Hewitt Light", system-ui, sans-serif;
+    --body:    "Cooper Hewitt Light", system-ui, sans-serif;
+    --main:    "Cooper Hewitt Semibold", system-ui, sans-serif;
     --bw: 1.5px;        /* datasheet hairline width */
   }
 
@@ -54,7 +71,7 @@
   body {
     font-family: var(--body);
     color: var(--ink);
-    background: #d9d9d9;
+    background: #ffffff;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -70,11 +87,12 @@
     box-shadow: 0 0 40px rgba(43,51,80,.18);
   }
 
-  /* Left navy rail with rotated label */
+  /* Left rail — now a white margin closed by a single hairline rule */
   .rail {
     flex: 0 0 46px;
-    background: var(--navy);
-    color: var(--paper);
+    background: var(--paper);
+    color: var(--ink);
+    border-right: var(--bw) solid var(--line);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -97,9 +115,9 @@
   }
   /* Every section paints its own paper; the map slot stays transparent so the
      full-bleed map shows through it as the sheet slides over. */
-  .meta, .serialhead, .address, .headblock,
+  .masthead, .meta, .serialhead, .address, .headblock,
   .figure .caption, .figure .coords,
-  .specs, .foot { background: var(--paper); }
+  .specs, .foot, .tagfoot { background: var(--paper); }
 
   /* ---------- Intro: tag drops in over a neutral backdrop ---------- */
   .shell {
@@ -120,6 +138,22 @@
   .lbl.amber { color: var(--amber); }
   .num { font-variant-numeric: tabular-nums; }
 
+  /* ---------- Masthead: the tag's HYBRID CONSTRUCTION banner ---------- */
+  .masthead { padding: 22px 16px 15px; border-bottom: var(--bw) solid var(--line); }
+  .masthead .brand {
+    font-family: var(--main); font-weight: 600;
+    text-transform: uppercase; letter-spacing: -.015em;
+    font-size: clamp(29px, 8.6vw, 40px); line-height: .95;
+    color: var(--ink); margin: 0;
+  }
+  .masthead .comp { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 13px; }
+
+  /* Barcode under the serial — echoes the scannable strip on the physical tag */
+  .serialhead .barcode {
+    display: block; width: 66%; max-width: 260px; height: 34px;
+    margin-top: 13px; fill: currentColor; color: #5b7aa8;
+  }
+
   /* ---------- Meta bar ---------- */
   .meta {
     display: flex; align-items: center; justify-content: space-between;
@@ -136,7 +170,7 @@
     font-family: var(--display); font-weight: 800;
     font-size: clamp(30px, 9.5vw, 42px);
     line-height: 1.12; letter-spacing: -.01em;
-    color: var(--titleYellow); font-variant-numeric: tabular-nums;
+    color: var(--ink); font-variant-numeric: tabular-nums;
   }
   /* NFC scan moment — unresolved characters sit at low ink until they lock */
   .serialhead .no .sn-char { opacity: .35; transition: opacity 120ms linear; }
@@ -159,7 +193,7 @@
   /* ---------- Headline block ---------- */
   .headblock { padding: 20px 16px 18px; border-bottom: var(--bw) solid var(--line); }
   .headline {
-    font-family: var(--title); font-weight: 700;
+    font-family: var(--main); font-weight: 600;
     font-size: 19px;
     line-height: 1.08; letter-spacing: -.015em;
     color: var(--ink); margin: 0 0 6px;
@@ -196,24 +230,55 @@
     padding: 9px 16px;
   }
 
+  /* ---------- Tag bottom: serial + barcode — the flip card resolves here ----------
+     The rolodex clones are children of this section, so when they finish the real
+     content is already identical underneath: a true morph, no fade. Flat datasheet
+     styling (hairline top rule, no rounded outline, no shadow). */
+  .tagfoot {
+    position: relative;
+    padding: 18px 16px 20px;
+    border-top: var(--bw) solid var(--line);
+    perspective: 800px; perspective-origin: center top;
+  }
+  .tagfoot .eyebrow { display: block; margin-bottom: 9px; }
+  .sn {
+    font-family: var(--main); font-weight: 600;
+    font-size: clamp(30px, 9.5vw, 44px); letter-spacing: .005em;
+    line-height: 1.05; color: var(--ink); font-variant-numeric: tabular-nums;
+  }
+  .sn-bar { display: block; width: 66%; max-width: 260px; height: 30px; margin-top: 12px; fill: #5b7aa8; }
+  /* flip clones that riffle over the real face during the intro */
+  .tf-flip {
+    position: absolute; inset: 0; z-index: 5;
+    background: var(--paper); padding: 18px 16px 20px;
+    transform-origin: center top; will-change: transform;
+  }
+  .tf-flip.rest { z-index: 2; }
+  /* hinged on its top edge — the card rolls DOWN around that axis onto the stack */
+  .tf-flip.incoming { transform: scale(1.12) rotateX(62deg); }
+  .tf-flip.incoming.land {
+    transition: transform var(--dur, 200ms) cubic-bezier(.22,.72,.24,1);
+    transform: scale(1) rotateX(0deg);
+  }
+
   /* ---------- Construction tag ---------- */
   .specs { border-bottom: var(--bw) solid var(--line); }
-  /* Navy title strip — datasheet header */
+  /* Title strip — datasheet header, now white with a hairline underline */
   .specs .head {
     display: flex; align-items: center; justify-content: space-between;
-    background: var(--navy); color: var(--paper);
+    background: var(--paper); color: var(--ink);
     padding: 11px 16px;
+    border-bottom: var(--bw) solid var(--line);
   }
   .specs .head span {
-    font-family: var(--title); font-weight: 600;
+    font-family: var(--title); font-weight: 400;
     text-transform: uppercase; letter-spacing: .12em;
-    font-size: 12px; color: var(--paper);
+    font-size: 12px; color: var(--ink);
   }
   /* Boxed cells — stamped material-ID plate; hairlines are the grid gap */
   .specs .grid {
     display: grid; grid-template-columns: 1fr 1fr;
     gap: var(--bw); background: var(--line);
-    border-top: var(--bw) solid var(--line);
   }
   .specs .cell {
     background: var(--paper);
@@ -235,7 +300,7 @@
   /* Lifespan bar — construction → demolition */
   .lifebar {
     display: block; height: 3px; margin-top: 8px;
-    background: rgba(60,73,107,.22);
+    background: rgba(127,154,186,.28);
   }
   .lifebar .fill {
     display: block; height: 100%; width: 0;
@@ -266,7 +331,7 @@
   .leaflet-bar a, .leaflet-touch .leaflet-bar a {
     border-radius: 0; color: var(--navy);
     font-family: var(--title); font-weight: 600;
-    border-bottom: 1px solid rgba(60,73,107,.28);
+    border-bottom: 1px solid rgba(127,154,186,.28);
   }
   .leaflet-bar a:last-child, .leaflet-touch .leaflet-bar a:last-child { border-bottom: none; }
 </style>
@@ -277,14 +342,18 @@
     <!-- Sheet -->
     <div class="sheet">
 
+      <header class="masthead">
+        <h1 class="brand">Hybrid Construction</h1>
+        <div class="comp">
+          <span class="lbl">22% Upcycled</span>
+          <span class="lbl">78% New Growth</span>
+        </div>
+      </header>
+
       <div class="meta">
         <span class="lbl">Record Number 001</span>
+        <span class="lbl">Product of Los Angeles</span>
       </div>
-
-      <section class="serialhead">
-        <span class="lbl eyebrow">Board Serial No.</span>
-        <div class="no">TAG-CA-2B9C74</div>
-      </section>
 
       <section class="address">
         <span class="lbl amber eyebrow">Location</span>
@@ -334,7 +403,15 @@
           <p class="big">Wood Structure Archive</p>
           <p class="sub">California timber structures · tap-to-scan record</p>
         </div>
+        <span class="lbl">Made in the USA</span>
       </footer>
+
+      <!-- Bottom of the tag: the scanned serial. The rolodex flip resolves right here. -->
+      <section class="tagfoot" id="tagfoot">
+        <span class="lbl eyebrow">Board Serial No.</span>
+        <div class="sn">18294-28-286</div>
+        <svg class="sn-bar" viewBox="0 0 320 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+      </section>
 
     </div>
   </main>
@@ -345,17 +422,21 @@
   <script>
     const lat = 36.9642, lng = -122.0189;
     const SITE = [lat, lng];
+    const US   = [39.5, -98.35];          // zoomed-out framing before we fly in
+    const SERIAL = "18294-28-286";
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-    const slot  = document.getElementById('map-slot');
-    const mapEl = document.getElementById('map');
-    const shell = document.querySelector('.shell');
+    const slot    = document.getElementById('map-slot');
+    const mapEl   = document.getElementById('map');
+    const shell   = document.querySelector('.shell');
+    const tagfoot = document.getElementById('tagfoot');
 
     const map = L.map('map', {
       zoomControl: false, scrollWheelZoom: false, attributionControl: true,
       dragging: false, touchZoom: false, doubleClickZoom: false,
       boxZoom: false, keyboard: false, tap: false,
-    }).setView(SITE, 15);
+    }).setView(US, 4);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 20,
@@ -368,17 +449,87 @@
     });
     L.marker([lat,lng], {icon: pin}).addTo(map).bindPopup('The Dipper · 1924–1968');
 
-    /* ---- Intro choreography: full-bleed map → sheet slides over → map docks in ----
-       The map loads full-bleed. We pan it so the site sits exactly under the slot's
-       final on-screen position, so when the sheet finishes sliding down the map is
-       already framed in Fig. 01 — then we dock the node into the slot (seamless,
-       since a 220px window into a z15 map == a standalone 220px z15 map). */
-    function alignMapToSlot() {
+    /* ---- Barcode strip — matches the scannable code on the physical tag ---- */
+    function barcodeBars() {
+      const W = 320, H = 40, widths = [2, 3, 5];
+      let x = 0, bar = true, out = '';
+      while (x < W) {
+        const w = widths[Math.floor(Math.random() * widths.length)];
+        if (bar) out += `<rect x="${x}" y="0" width="${Math.max(1, w - 0.6)}" height="${H}"/>`;
+        x += w; bar = !bar;
+      }
+      return out;
+    }
+    // the real, final barcode that the tag's serial rests on
+    const REALBARS = barcodeBars();
+    document.querySelector('.tagfoot .sn-bar').innerHTML = REALBARS;
+
+    /* ---- Rolodex flip: cards fold down over the real tag face, riffling through
+       random serials and landing on the scanned one. The clones live INSIDE the
+       tag's bottom section, so the final card is identical to the real content
+       underneath — removing the clones is a seamless morph, not a fade. ---- */
+    function randSerial() {
+      const d = n => Array.from({length:n}, () => Math.floor(Math.random()*10)).join('');
+      return `${d(5)}-${d(2)}-${d(3)}`;
+    }
+    function tfClone(serial, bars, cls) {
+      const c = document.createElement('div');
+      c.className = 'tf-flip ' + cls;
+      c.innerHTML = `<span class="lbl eyebrow">Board Serial No.</span>
+                     <div class="sn">${serial}</div>
+                     <svg class="sn-bar" viewBox="0 0 320 40" preserveAspectRatio="none" aria-hidden="true">${bars}</svg>`;
+      return c;
+    }
+    let tfCurrent = null;
+    function tfFlipIn(serial, bars, dur) {
+      return new Promise(res => {
+        const nc = tfClone(serial, bars, 'incoming');
+        nc.style.setProperty('--dur', dur + 'ms');
+        tagfoot.appendChild(nc);
+        requestAnimationFrame(() => requestAnimationFrame(() => nc.classList.add('land')));
+        setTimeout(() => {
+          if (tfCurrent && tfCurrent.parentNode) tfCurrent.remove();  // old card fully covered
+          nc.classList.remove('incoming', 'land');
+          nc.classList.add('rest');
+          tfCurrent = nc;
+          res();
+        }, dur);
+      });
+    }
+    async function runRolodex() {
+      tfCurrent = tfClone(randSerial(), barcodeBars(), 'rest');
+      tagfoot.appendChild(tfCurrent);
+      const queue = [];
+      const SPINS = 16;
+      for (let i = 0; i < SPINS; i++) queue.push([randSerial(), barcodeBars()]);
+      queue.push([SERIAL, REALBARS]);                    // land on the real serial + barcode
+      for (let i = 0; i < queue.length; i++) {
+        const t = i / (queue.length - 1);
+        const dur = 105 + 340 * Math.pow(t, 2.4);        // ease-in slowdown
+        await tfFlipIn(queue[i][0], queue[i][1], dur);
+        if (i < queue.length - 1) await sleep(dur * 0.10);
+      }
+      await sleep(550);
+      tagfoot.querySelectorAll('.tf-flip').forEach(n => n.remove());  // reveal identical real face
+      tfCurrent = null;
+    }
+
+    function flyToSite() {
+      return new Promise(resolve => {
+        let done = false; const fin = () => { if (done) return; done = true; resolve(); };
+        map.once('moveend', fin);
+        map.flyTo(SITE, 15, { duration: 3.0, easeLinearity: 0.22 });
+        setTimeout(fin, 3400);
+      });
+    }
+
+    /* Frame the site under the slot's LANDED position. `parkY` is the (negative)
+       transform the sheet is parked at; sliding to 0 shifts the slot down by -parkY. */
+    function alignMapToSlot(parkY) {
       const rect = slot.getBoundingClientRect();
-      const shellH = shell.offsetHeight;                 // sheet is parked one height up
       const slotCenter = L.point(
         rect.left + rect.width / 2,
-        rect.top + shellH + rect.height / 2              // where the slot lands
+        rect.top + (-parkY) + rect.height / 2
       );
       const mapCenter = map.getSize().divideBy(2);
       map.setView(SITE, 15, { animate: false });
@@ -399,37 +550,53 @@
 
     if (reducedMotion) {
       shell.classList.remove('offstage');
+      shell.style.transform = 'none';
+      map.setView(SITE, 15, { animate: false });
       dockMap();
     } else {
-      document.body.classList.add('intro-lock');
-      alignMapToSlot();   // frame the site under the slot's landing spot
+      (async () => {
+        document.body.classList.add('intro-lock');
+        if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
 
-      // Sheet slides down over the full-bleed map
-      requestAnimationFrame(() => requestAnimationFrame(() => {
+        // Park the sheet so ONLY its bottom (the tag face) sits at the top of the
+        // screen, with the zoomed-out map showing behind it.
+        const GAP = 10;
         shell.classList.remove('offstage');
-        runSerialDecode();
-      }));
+        const parkY = -(tagfoot.offsetTop - GAP);
+        shell.style.transition = 'none';
+        shell.style.transform = `translateY(${parkY}px)`;
+        void shell.offsetWidth;
 
-      // Once the sheet lands, dock the framed map into the slot
-      const fallback = setTimeout(dockMap, 5400);
-      shell.addEventListener('transitionend', function onEnd(e) {
-        if (e.propertyName !== 'transform') return;
-        shell.removeEventListener('transitionend', onEnd);
-        clearTimeout(fallback);
-        dockMap();
-      });
+        await runRolodex();     // 1 — flip down, land on the serial
+        await flyToSite();      // 2 — zoom from the US into the site (tag stays put)
+
+        alignMapToSlot(parkY);  // frame the site under the slot's landing spot
+
+        // 3 — the whole tag slides down to frame the map
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          shell.style.transition = 'transform 2.6s cubic-bezier(.16,.84,.28,1)';
+          shell.style.transform = 'translateY(0)';
+        }));
+        const fallback = setTimeout(dockMap, 3400);
+        shell.addEventListener('transitionend', function onEnd(e) {
+          if (e.propertyName !== 'transform') return;
+          shell.removeEventListener('transitionend', onEnd);
+          clearTimeout(fallback);
+          dockMap();
+        });
+      })();
 
       // A tap anywhere skips straight to the finished record
       window.addEventListener('pointerdown', () => {
         if (docked) return;
+        tagfoot.querySelectorAll('.tf-flip').forEach(n => n.remove());
         shell.style.transition = 'none';
-        shell.classList.remove('offstage');
-        runSerialDecode();
+        shell.style.transform = 'translateY(0)';
         dockMap();
       }, { once: true });
     }
 
-    /* ---- NFC scan moment: serial resolves character by character ---- */
+    /* ---- (legacy per-character serial scramble, superseded by the rolodex) ---- */
     let decodeStarted = false;
     function runSerialDecode() {
       if (decodeStarted) return;
