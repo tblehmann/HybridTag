@@ -115,7 +115,7 @@
   }
   /* Every section paints its own paper; the map slot stays transparent so the
      full-bleed map shows through it as the sheet slides over. */
-  .masthead, .meta, .serialhead, .address, .headblock,
+  .masthead, .meta, .address, .headblock,
   .figure .caption, .figure .coords,
   .specs, .foot, .tagfoot { background: var(--paper); }
 
@@ -148,12 +148,6 @@
   }
   .masthead .comp { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 13px; }
 
-  /* Barcode under the serial — echoes the scannable strip on the physical tag */
-  .serialhead .barcode {
-    display: block; width: 66%; max-width: 260px; height: 34px;
-    margin-top: 13px; fill: currentColor; color: #5b7aa8;
-  }
-
   /* ---------- Meta bar ---------- */
   .meta {
     display: flex; align-items: center; justify-content: space-between;
@@ -162,19 +156,6 @@
     border-bottom: var(--bw) solid var(--line);
   }
   .meta .serial { white-space: nowrap; }
-
-  /* ---------- Serial header ---------- */
-  .serialhead { padding: 18px 16px 17px; }
-  .serialhead .eyebrow { display: block; margin-bottom: 9px; }
-  .serialhead .no {
-    font-family: var(--display); font-weight: 800;
-    font-size: clamp(30px, 9.5vw, 42px);
-    line-height: 1.12; letter-spacing: -.01em;
-    color: var(--ink); font-variant-numeric: tabular-nums;
-  }
-  /* NFC scan moment — unresolved characters sit at low ink until they lock */
-  .serialhead .no .sn-char { opacity: .35; transition: opacity 120ms linear; }
-  .serialhead .no .sn-char.locked { opacity: 1; }
 
   /* ---------- Address header ---------- */
   .address { padding: 16px 16px 15px; }
@@ -260,6 +241,57 @@
     transition: transform var(--dur, 200ms) cubic-bezier(.22,.72,.24,1);
     transform: scale(1) rotateX(0deg);
   }
+
+  /* ---------- Browse button (record → rolodex) ---------- */
+  .browse-btn {
+    -webkit-appearance: none; appearance: none; cursor: pointer;
+    display: block; width: 100%;
+    font-family: var(--title); font-weight: 600; text-transform: uppercase;
+    letter-spacing: .16em; font-size: 11px; color: var(--ink);
+    background: var(--paper); border: none; border-top: var(--bw) solid var(--line);
+    padding: 16px; -webkit-tap-highlight-color: transparent;
+  }
+  .browse-btn:active { background: #f2f5f8; }
+
+  /* ---------- Rolodex: browse the tag archive ---------- */
+  #rolodex {
+    position: fixed; inset: 0; z-index: 400; display: none;
+    touch-action: none; overscroll-behavior: contain;
+    -webkit-tap-highlight-color: transparent;
+    perspective: 800px; perspective-origin: center top;   /* same 3D space as the intro flip */
+  }
+  #rolodex.active { display: block; }
+  #rolodex .rc-hint {
+    position: absolute; bottom: calc(env(safe-area-inset-bottom) + 24px); left: 0; right: 0;
+    text-align: center; pointer-events: none;
+  }
+  /* the deck card sits exactly where the intro tag face parks: flat, full-width, at the top,
+     with the serial in the same spot (matches .tagfoot padding + type). */
+  .rcard-face {
+    position: absolute; left: 0; right: 0; margin-inline: auto; top: 10px;
+    width: 100%; max-width: 480px;
+    background: var(--paper);
+    padding: 18px 16px 22px; will-change: transform;
+    transform-origin: center top;   /* hinge on the top edge — same point as the intro flip */
+  }
+  /* a card rolling in rotates down from the top edge, identical to the intro's .tf-flip */
+  .rcard-face.rc-incoming { z-index: 5; transform: scale(1.12) rotateX(62deg); }
+  .rcard-face.rc-incoming.rc-land {
+    transition: transform 340ms cubic-bezier(.22,.72,.24,1);
+    transform: scale(1) rotateX(0deg);
+  }
+  .rcard-face .lbl { display: block; margin-bottom: 9px; }
+  .rcard-face .rc-serial {
+    font-family: var(--main); font-weight: 600;
+    font-size: clamp(30px, 9.5vw, 44px); letter-spacing: .005em;
+    font-variant-numeric: tabular-nums; line-height: 1.05; margin: 0;
+  }
+  .rcard-face .rc-bar { display: block; width: 66%; max-width: 260px; height: 30px; margin-top: 12px; fill: #5b7aa8; }
+  .rcard-face .rc-name {
+    font-family: var(--main); font-weight: 600; font-size: 15px;
+    line-height: 1.22; margin-top: 16px;
+  }
+  .rcard-face .rc-city { font-size: 12.5px; margin-top: 3px; color: var(--ink); }
 
   /* ---------- Construction tag ---------- */
   .specs { border-bottom: var(--bw) solid var(--line); }
@@ -406,6 +438,8 @@
         <span class="lbl">Made in the USA</span>
       </footer>
 
+      <button class="browse-btn" id="browseBtn">Browse the tag archive ↑</button>
+
       <!-- Bottom of the tag: the scanned serial. The rolodex flip resolves right here. -->
       <section class="tagfoot" id="tagfoot">
         <span class="lbl eyebrow">Board Serial No.</span>
@@ -419,14 +453,111 @@
   <!-- Full-bleed map: loads behind the sheet, docks into Fig. 01 once the sheet lands -->
   <div id="map"></div>
 
+  <!-- Rolodex: browse the tag archive; swipe up to flip, pull a card down to open -->
+  <div id="rolodex" aria-hidden="true">
+    <div class="rcard-face" id="deckCard"></div>
+    <div class="rc-hint"><span class="lbl"><span id="deckCount"></span> · swipe up to flip · pull a card down to open</span></div>
+  </div>
+
   <script>
-    const lat = 36.9642, lng = -122.0189;
-    const SITE = [lat, lng];
-    const US   = [39.5, -98.35];          // zoomed-out framing before we fly in
-    const SERIAL = "18294-28-286";
+    /* ======================= config + helpers ======================= */
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const q = s => document.querySelector(s);
+    const US = [39.5, -98.35];            // zoomed-out framing
+    const MONTHS = ['January','February','March','April','May','June','July',
+                    'August','September','October','November','December'];
 
+    /* ======================= data: parse boards.md ======================= */
+    // Inline fallback (first 10 records) for when fetch is unavailable (e.g. file://).
+    const FALLBACK_RECORDS = [
+      {serial:'TAG-CA-8F3A21',name:'Golden Gate Redwood Dance Pavilion',type:'Dance Pavilion',address:'1420 Great Highway',city:'San Francisco',state:'CA',lat:'37.7599',lng:'-122.5107',construction_type:'Redwood post-and-beam frame',construction_date:'1908-05-14',demolition_date:'1974-09-02'},
+      {serial:'TAG-CA-2B9C74',name:'Santa Cruz Boardwalk Wooden Coaster "The Dipper"',type:'Wooden Roller Coaster',address:'400 Beach Street',city:'Santa Cruz',state:'CA',lat:'36.9642',lng:'-122.0189',construction_type:'Douglas fir trestle and track structure',construction_date:'1924-06-20',demolition_date:'1968-03-11'},
+      {serial:'TAG-CA-5D1E08',name:'Mendocino Presbyterian Timber Chapel',type:'Church',address:'44831 Main Street',city:'Mendocino',state:'CA',lat:'39.3057',lng:'-123.7995',construction_type:'Old-growth redwood board-and-batten',construction_date:'1898-11-03',demolition_date:'1961-07-19'},
+      {serial:'TAG-CA-9A44F2',name:'Pasadena Grand Opera House',type:'Opera House',address:'88 South Raymond Avenue',city:'Pasadena',state:'CA',lat:'34.1446',lng:'-118.1490',construction_type:'Heavy timber balloon frame',construction_date:'1912-02-28',demolition_date:'1959-12-05'},
+      {serial:'TAG-CA-3C77B1',name:'Truckee River Log Lodge',type:'Mountain Lodge',address:'10200 Donner Pass Road',city:'Truckee',state:'CA',lat:'39.3280',lng:'-120.1833',construction_type:'Full-scribe log construction',construction_date:'1931-08-16',demolition_date:'1993-05-27'},
+      {serial:'TAG-CA-6E22A9',name:'Long Beach Pike Bathhouse',type:'Seaside Bathhouse',address:'200 East Seaside Way',city:'Long Beach',state:'CA',lat:'33.7625',lng:'-118.1895',construction_type:'Timber-frame with wood shingle cladding',construction_date:'1905-04-09',demolition_date:'1971-10-14'},
+      {serial:'TAG-CA-1F88D3',name:'Napa Valley Grange Hall',type:'Grange Hall',address:'1005 Third Street',city:'Napa',state:'CA',lat:'38.2975',lng:'-122.2869',construction_type:'Timber frame, board siding',construction_date:'1916-09-22',demolition_date:'1988-01-30'},
+      {serial:'TAG-CA-7B03C6',name:'Eureka Carson Carriage Barn',type:'Carriage Barn',address:'143 M Street',city:'Eureka',state:'CA',lat:'40.8021',lng:'-124.1637',construction_type:'Redwood mortise-and-tenon frame',construction_date:'1889-07-11',demolition_date:'1955-04-18'},
+      {serial:'TAG-CA-4A55E7',name:'Monterey Cannery Row Sardine Works',type:'Cannery',address:'700 Cannery Row',city:'Monterey',state:'CA',lat:'36.6155',lng:'-121.9008',construction_type:'Douglas fir post-and-beam',construction_date:'1921-03-05',demolition_date:'1979-08-23'},
+      {serial:'TAG-CA-0C99A4',name:'Nevada City Nevada Theatre',type:'Theatre',address:'401 Broad Street',city:'Nevada City',state:'CA',lat:'39.2616',lng:'-121.0161',construction_type:'Timber frame with wood truss roof',construction_date:'1903-10-27',demolition_date:'1966-06-09'},
+    ];
+    function parseBoards(txt){
+      const recs = [];
+      for (const block of txt.split(/\n-{3,}\s*\n/)) {
+        const rec = {};
+        for (const line of block.split('\n')) {
+          const m = line.match(/^([a-z_]+):\s*(.*)$/i);
+          if (m) rec[m[1]] = m[2].trim();
+        }
+        if (rec.serial) recs.push(rec);
+      }
+      return recs;
+    }
+    async function loadBoards(){
+      try {
+        const res = await fetch('boards/boards.md');
+        if (!res.ok) throw new Error('fetch');
+        const recs = parseBoards(await res.text());
+        return recs.length ? recs.slice(0, 10) : FALLBACK_RECORDS;
+      } catch (e) { return FALLBACK_RECORDS; }
+    }
+
+    /* ======================= data: derive stable specs ======================= */
+    function hashStr(s){ let h = 2166136261 >>> 0; for (let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+    function mulberry32(a){ return function(){ a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+    const yearOf = iso => iso.split('-')[0];
+    function fmtDate(iso){ const [y,m,d] = iso.split('-').map(Number); return `${MONTHS[m-1]} ${d}, ${y}`; }
+
+    function deriveSpecs(record){
+      const rng = mulberry32(hashStr(record.serial));
+      const pick = a => a[Math.floor(rng() * a.length)];
+      const between = (lo, hi) => Math.round(lo + rng() * (hi - lo));
+      const ct = (record.construction_type || '').toLowerCase();
+      let species = 'timber';
+      if (ct.includes('redwood')) species = 'redwood';
+      else if (ct.includes('fir') || ct.includes('douglas')) species = 'Douglas fir';
+      else if (ct.includes('pine') || ct.includes('spf')) species = 'pine';
+      else if (ct.includes('cedar')) species = 'cedar';
+      else if (ct.includes('log')) species = 'pine';
+
+      const agency = species === 'redwood' ? 'RIS' : 'WWPA';
+      const gradeStamp = `${agency} · ${pick(['No. 1 & Btr','No. 2 & Btr','Select Structural','Construction','Standard & Btr'])} · ${pick(['S-DRY','MC 15','KD-HT','S-GRN'])}`;
+      const stressClass = species === 'Douglas fir' ? 'C24 / DF-L'
+                        : species === 'redwood' ? 'C16 / Redwd'
+                        : species === 'pine' ? 'C18 / SPF' : 'C20 / No.2';
+      const gradeRules = species === 'redwood' ? 'RIS (1926 ed.)'
+                       : species === 'pine' ? 'WWPA (1931 ed.)' : 'WWPA / WCLIB (1923 ed.)';
+      const densLo = species === 'redwood' ? 25 : species === 'cedar' ? 22 : species === 'pine' ? 27 : 31;
+      const wLb = between(9, 34);
+      const cY = +yearOf(record.construction_date), dY = +yearOf(record.demolition_date);
+      const up = between(10, 45);
+      const digits = Array.from({length:10}, () => Math.floor(rng()*10)).join('');
+
+      return {
+        species, material: record.construction_type,
+        gradeStamp, stressClass, gradeRules,
+        surface: pick(['S4S','S4S, weathered','Rough-sawn','Resawn, weathered','S1S2E']),
+        dims: pick(['2 × 4 × 8′','2 × 6 × 10′','2 × 8 × 12′','4 × 4 × 8′','1 × 6 × 8′','2 × 10 × 16′']),
+        weight: `${wLb} lb (${(wLb*0.4536).toFixed(1)} kg)`,
+        moisture: `${between(8,18)}% EMC`,
+        density: `${between(densLo, densLo+5)} lb/ft³`,
+        modulus: `${(between(11,19)/10)}×10⁶ psi`,
+        bending: `${between(700,1450)} psi`,
+        up, grow: 100 - up,
+        boardSerial: `${digits.slice(0,5)}-${digits.slice(5,7)}-${digits.slice(7,10)}`,
+        zip: `9${String(between(1000,5999)).padStart(4,'0')}`,
+        builtStr: fmtDate(record.construction_date),
+        demoStr: fmtDate(record.demolition_date),
+        cY, dY, serviceYears: dY - cY,
+      };
+    }
+    function makeLede(record, d){
+      const art = /^[aeiou]/i.test(d.species) ? 'An' : 'A';
+      return `${art} ${d.species} ${record.type.toLowerCase()} that stood in ${record.city} from ${d.cY} until it was dismantled in ${d.dY}.`;
+    }
+
+    /* ======================= map ======================= */
     const slot    = document.getElementById('map-slot');
     const mapEl   = document.getElementById('map');
     const shell   = document.querySelector('.shell');
@@ -447,7 +578,11 @@
       html: '<div style="width:18px;height:18px;background:#db951d;border:3px solid #ffffff;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(43,51,80,.5)"></div>',
       iconSize: [18,18], iconAnchor: [9,18],
     });
-    L.marker([lat,lng], {icon: pin}).addTo(map).bindPopup('The Dipper · 1924–1968');
+    let marker = L.marker(US, {icon: pin}).addTo(map);
+
+    /* ======================= record state ======================= */
+    let RECORDS = [], CURRENT = null, CURRENT_IDX = 0, DERIVED = null;
+    let SITE = US, SERIAL = '', REALBARS = '';
 
     /* ---- Barcode strip — matches the scannable code on the physical tag ---- */
     function barcodeBars() {
@@ -460,9 +595,65 @@
       }
       return out;
     }
-    // the real, final barcode that the tag's serial rests on
-    const REALBARS = barcodeBars();
-    document.querySelector('.tagfoot .sn-bar').innerHTML = REALBARS;
+    /* ======================= render a record into the sheet ======================= */
+    let lifeObs = null;
+    function renderSpecs(record, d){
+      const rows = [
+        ['Grade Stamp', d.gradeStamp, 'wide'],
+        ['Type', record.type, 'wide'],
+        ['Material', d.material, 'wide'],
+        ['Dimensions', d.dims, 'num'],
+        ['Weight', d.weight, 'num'],
+        ['Moisture', d.moisture, 'num'],
+        ['Density', d.density, 'num'],
+        ['Stress Class', d.stressClass, 'num'],
+        ['Surface', d.surface, ''],
+        ['Modulus (E)', d.modulus, 'num'],
+        ['Bending (Fb)', d.bending, 'num'],
+        ['Grade Rules', d.gradeRules, 'wide num'],
+        ['Built', d.builtStr, 'num'],
+        ['Demolished', d.demoStr, 'num'],
+      ];
+      let html = rows.map(([k, v, cls]) => {
+        const wide = cls.includes('wide') ? ' wide' : '';
+        const num = cls.includes('num') ? ' num' : '';
+        return `<div class="cell${wide}"><span class="k">${k}</span><span class="v${num}">${v}</span></div>`;
+      }).join('');
+      html += `<div class="cell wide"><span class="k">Service Life</span><span class="v num">${d.serviceYears} years · ${d.cY}–${d.dY}<span class="lifebar"><span class="fill"></span></span></span></div>`;
+      q('.specs .grid').innerHTML = html;
+      // (re)wire the lifespan bar fill
+      if (lifeObs) { lifeObs.disconnect(); lifeObs = null; }
+      const fill = q('.lifebar .fill');
+      if (!fill) return;
+      if (reducedMotion || !('IntersectionObserver' in window)) { fill.style.width = '100%'; return; }
+      lifeObs = new IntersectionObserver(es => {
+        if (es.some(e => e.isIntersecting)) { fill.style.width = '100%'; lifeObs.disconnect(); }
+      }, { threshold: 0.6 });
+      lifeObs.observe(fill.parentElement);
+    }
+    function renderRecord(record, idx){
+      CURRENT = record; CURRENT_IDX = idx;
+      const d = DERIVED = deriveSpecs(record);
+      SITE = [parseFloat(record.lat), parseFloat(record.lng)];
+      SERIAL = d.boardSerial;
+      REALBARS = barcodeBars();
+
+      document.title = `${record.name} — TagAPP`;
+      q('.masthead .comp').innerHTML =
+        `<span class="lbl">${d.up}% Upcycled</span><span class="lbl">${d.grow}% New Growth</span>`;
+      q('.meta .lbl').textContent = `Record Number ${String(idx + 1).padStart(3, '0')}`;
+      q('.address .street').textContent = record.address;
+      q('.address .city').textContent = `${record.city}, ${record.state} ${d.zip}`;
+      q('.headline').textContent = record.name;
+      q('.lede').textContent = makeLede(record, d);
+      const coords = document.querySelectorAll('.coords .lbl');
+      coords[0].textContent = `Lat ${record.lat}`;
+      coords[1].textContent = `Lng ${String(record.lng).replace('-', '−')}`;
+      renderSpecs(record, d);
+      q('.tagfoot .sn').textContent = SERIAL;
+      q('.tagfoot .sn-bar').innerHTML = REALBARS;
+      marker.setLatLng(SITE).bindPopup(`${record.name} · ${d.cY}–${d.dY}`);
+    }
 
     /* ---- Rolodex flip: cards fold down over the real tag face, riffling through
        random serials and landing on the scanned one. The clones live INSIDE the
@@ -514,12 +705,12 @@
       tfCurrent = null;
     }
 
-    function flyToSite() {
+    function flyTo(target, zoom, dur = 3.0){
       return new Promise(resolve => {
         let done = false; const fin = () => { if (done) return; done = true; resolve(); };
         map.once('moveend', fin);
-        map.flyTo(SITE, 15, { duration: 3.0, easeLinearity: 0.22 });
-        setTimeout(fin, 3400);
+        map.flyTo(target, zoom, { duration: dur, easeLinearity: 0.22 });
+        setTimeout(fin, dur * 1000 + 500);
       });
     }
 
@@ -538,7 +729,6 @@
 
     let docked = false;
     function dockMap() {
-      if (docked) return;
       docked = true;
       document.body.classList.remove('intro-lock');
       slot.appendChild(mapEl);
@@ -548,107 +738,194 @@
       map.setView(SITE, 15, { animate: false });
     }
 
-    if (reducedMotion) {
-      shell.classList.remove('offstage');
-      shell.style.transform = 'none';
-      map.setView(SITE, 15, { animate: false });
-      dockMap();
-    } else {
-      (async () => {
-        document.body.classList.add('intro-lock');
-        if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
-
-        // Park the sheet so ONLY its bottom (the tag face) sits at the top of the
-        // screen, with the zoomed-out map showing behind it.
-        const GAP = 10;
-        shell.classList.remove('offstage');
-        const parkY = -(tagfoot.offsetTop - GAP);
-        shell.style.transition = 'none';
-        shell.style.transform = `translateY(${parkY}px)`;
-        void shell.offsetWidth;
-
-        await runRolodex();     // 1 — flip down, land on the serial
-        await flyToSite();      // 2 — zoom from the US into the site (tag stays put)
-
-        alignMapToSlot(parkY);  // frame the site under the slot's landing spot
-
-        // 3 — the whole tag slides down to frame the map
+    // slide the whole tag to a Y offset; resolves when the transition ends
+    function slideShellTo(y, ms){
+      return new Promise(res => {
         requestAnimationFrame(() => requestAnimationFrame(() => {
-          shell.style.transition = 'transform 2.6s cubic-bezier(.16,.84,.28,1)';
-          shell.style.transform = 'translateY(0)';
+          shell.style.transition = `transform ${ms}ms cubic-bezier(.16,.84,.28,1)`;
+          shell.style.transform = `translateY(${y}px)`;
         }));
-        const fallback = setTimeout(dockMap, 3400);
-        shell.addEventListener('transitionend', function onEnd(e) {
+        let done = false; const fin = () => { if (done) return; done = true; res(); };
+        const fb = setTimeout(fin, ms + 400);
+        shell.addEventListener('transitionend', function h(e){
           if (e.propertyName !== 'transform') return;
-          shell.removeEventListener('transitionend', onEnd);
-          clearTimeout(fallback);
-          dockMap();
+          shell.removeEventListener('transitionend', h); clearTimeout(fb); fin();
         });
-      })();
+      });
+    }
 
-      // A tap anywhere skips straight to the finished record
-      window.addEventListener('pointerdown', () => {
-        if (docked) return;
+    /* ---- Intro: park the tag at the top over the zoomed-out map, flip to the
+       scanned serial, zoom into the site, then slide the tag down to frame it. ---- */
+    let introSkipped = false;
+    async function playIntro(){
+      document.body.classList.add('intro-lock');
+      if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+      const GAP = 10;
+      shell.classList.remove('offstage');
+      const parkY = -(tagfoot.offsetTop - GAP);
+      shell.style.transition = 'none';
+      shell.style.transform = `translateY(${parkY}px)`;
+      void shell.offsetWidth;
+
+      const skip = () => {
+        if (docked || introSkipped) return; introSkipped = true;
         tagfoot.querySelectorAll('.tf-flip').forEach(n => n.remove());
         shell.style.transition = 'none';
         shell.style.transform = 'translateY(0)';
         dockMap();
-      }, { once: true });
+      };
+      window.addEventListener('pointerdown', skip, { once: true });
+
+      await runRolodex();                 // 1 — flip down, land on the scanned serial
+      if (introSkipped) return;
+      await flyTo(SITE, 15);              // 2 — zoom from the US into the site
+      if (introSkipped) return;
+      alignMapToSlot(parkY);
+      await slideShellTo(0, 2600);        // 3 — the tag slides down to frame the map
+      window.removeEventListener('pointerdown', skip);
+      dockMap();
     }
 
-    /* ---- (legacy per-character serial scramble, superseded by the rolodex) ---- */
-    let decodeStarted = false;
-    function runSerialDecode() {
-      if (decodeStarted) return;
-      decodeStarted = true;
-      const el = document.querySelector('.serialhead .no');
-      if (!el || reducedMotion) return;
+    /* ======================= rolodex browsing loop ======================= */
+    const rolodex  = document.getElementById('rolodex');
+    const deckCard = document.getElementById('deckCard');
+    const deckCount = document.getElementById('deckCount');
+    let mode = 'record';       // 'record' | 'rolodex'
+    let deckIndex = 0;
 
-      const finalText = el.textContent.trim();
-      const CHARSET = '0123456789ABCDEF';
-      el.textContent = '';
-      const spans = finalText.split('').map(ch => {
-        const s = document.createElement('span');
-        s.className = 'sn-char' + (ch === '-' ? ' locked' : '');
-        s.textContent = ch;
-        el.appendChild(s);
-        return s;
-      });
-
-      const live = spans.filter(s => s.textContent !== '-');
-      const finals = finalText.split('').filter(ch => ch !== '-');
-      let locked = 0;
-
-      const scramble = setInterval(() => {
-        for (let i = locked; i < live.length; i++) {
-          live[i].textContent = CHARSET[Math.floor(Math.random() * CHARSET.length)];
-        }
-      }, 45);
-
-      const lock = setInterval(() => {
-        live[locked].textContent = finals[locked];
-        live[locked].classList.add('locked');
-        locked++;
-        if (locked >= live.length) { clearInterval(lock); clearInterval(scramble); }
-      }, 110);
+    // return the full-bleed map to the body (inverse of dockMap)
+    function undockMap(){
+      docked = false;
+      mapEl.classList.remove('docked');
+      document.body.appendChild(mapEl);
+      slot.classList.add('pending');
+      map.invalidateSize();
     }
 
-    /* ---- Lifespan bar fills when the spec table scrolls into view ---- */
-    (function () {
-      const fill = document.querySelector('.lifebar .fill');
-      if (!fill) return;
-      if (reducedMotion || !('IntersectionObserver' in window)) {
-        fill.style.width = '100%';
-        return;
+    function deckCardHTML(r, d){
+      return `<span class="lbl">Board Serial No.</span>
+              <div class="rc-serial">${d.boardSerial}</div>
+              <svg class="rc-bar" viewBox="0 0 320 40" preserveAspectRatio="none" aria-hidden="true">${barcodeBars()}</svg>
+              <div class="rc-name">${r.name}</div>
+              <div class="rc-city">${r.city}, ${r.state}</div>`;
+    }
+    function setDeckContent(i){
+      const r = RECORDS[i], d = deriveSpecs(r);
+      deckCard.innerHTML = deckCardHTML(r, d);
+      deckCount.textContent = `${String(i+1).padStart(2,'0')} / ${String(RECORDS.length).padStart(2,'0')}`;
+    }
+    function deckRest(){
+      deckCard.style.transition = 'none';
+      deckCard.style.transform = 'translateY(0px)';
+    }
+    function showDeckCard(i){ setDeckContent(i); deckRest(); }
+
+    // Flip to card i using the SAME roll-down as the intro: a clone rotates down from the
+    // top hinge and covers the current card — coherent with the opening animation.
+    let deckBusy = false;
+    function deckRollTo(i){
+      deckBusy = true;
+      const r = RECORDS[i], d = deriveSpecs(r);
+      const nc = document.createElement('div');
+      nc.className = 'rcard-face rc-incoming';
+      nc.innerHTML = deckCardHTML(r, d);
+      rolodex.appendChild(nc);
+      requestAnimationFrame(() => requestAnimationFrame(() => nc.classList.add('rc-land')));
+      setTimeout(() => {
+        deckIndex = i;
+        setDeckContent(i);
+        deckRest();
+        nc.remove();
+        deckBusy = false;
+      }, 340);
+    }
+    function deckAdvance(){
+      deckRest();                                    // current snaps flat, hidden under the incoming
+      deckRollTo((deckIndex + 1) % RECORDS.length);
+    }
+    function deckSnapBack(){
+      deckCard.style.transition = 'transform .25s ease';
+      deckCard.style.transform = 'translateY(0px)';
+    }
+
+    // record → rolodex: push the tag up, zoom the map back out, reveal the deck
+    function enterRolodex(){
+      if (mode !== 'record') return;
+      mode = 'rolodex';
+      document.body.classList.add('intro-lock');
+      undockMap();
+      flyTo(US, 4, 2.0);
+      shell.style.transition = 'transform .6s cubic-bezier(.5,0,.2,1)';
+      shell.style.transform = 'translateY(-100%)';
+      deckIndex = CURRENT_IDX;
+      showDeckCard(deckIndex);
+      rolodex.classList.add('active');
+      rolodex.setAttribute('aria-hidden', 'false');
+    }
+
+    // rolodex → record: zoom into the picked site, slide the tag back down to frame it
+    async function openRecord(i){
+      if (mode !== 'rolodex') return;
+      mode = 'record';
+      rolodex.classList.remove('active');
+      rolodex.setAttribute('aria-hidden', 'true');
+      renderRecord(RECORDS[i], i);
+      await flyTo(SITE, 15, 2.4);
+      const parkY = -(tagfoot.offsetTop - 10);
+      shell.style.transition = 'none';
+      shell.style.transform = `translateY(${parkY}px)`;
+      void shell.offsetWidth;
+      alignMapToSlot(parkY);
+      await slideShellTo(0, 2200);
+      dockMap();
+    }
+
+    // touch-first deck gestures: swipe up = next, pull a card down = open, tap = open
+    let dg = null;
+    rolodex.addEventListener('pointerdown', e => {
+      if (mode !== 'rolodex' || deckBusy) return;
+      dg = { y: e.clientY, t: e.timeStamp, dy: 0 };
+      deckCard.style.transition = 'none';
+      try { rolodex.setPointerCapture(e.pointerId); } catch (x) {}
+    });
+    rolodex.addEventListener('pointermove', e => {
+      if (!dg) return;
+      dg.dy = e.clientY - dg.y;
+      // follow the finger down; resist upward past the hinge so the flip feels weighted
+      const y = dg.dy < 0 ? dg.dy * 0.6 : dg.dy;
+      deckCard.style.transform = `translateY(${y}px)`;
+    });
+    rolodex.addEventListener('pointerup', e => {
+      if (!dg) return;
+      const { dy, t } = dg; dg = null;
+      const dt = e.timeStamp - t, vel = dy / Math.max(dt, 1);
+      if (dy < -48 || vel < -0.5) deckAdvance();            // swipe up → next (rolls down like the intro)
+      else if (dy > 96 || vel > 0.7) openRecord(deckIndex); // deliberate pull down → open
+      else deckSnapBack();                                   // anything short (incl. a stray tap) → nothing
+    });
+    rolodex.addEventListener('pointercancel', () => { if (dg) { dg = null; deckSnapBack(); } });
+
+    document.getElementById('browseBtn').addEventListener('click', enterRolodex);
+
+    /* ======================= boot ======================= */
+    async function main(){
+      RECORDS = await loadBoards();
+      const tag = new URLSearchParams(location.search).get('tag') || location.hash.replace('#', '');
+      let idx = RECORDS.findIndex(r => r.serial === tag);
+      if (idx < 0) idx = RECORDS.findIndex(r => r.serial === 'TAG-CA-2B9C74');
+      if (idx < 0) idx = 0;
+      renderRecord(RECORDS[idx], idx);
+
+      if (reducedMotion) {
+        shell.classList.remove('offstage');
+        shell.style.transform = 'none';
+        map.setView(SITE, 15, { animate: false });
+        dockMap();
+      } else {
+        await playIntro();
       }
-      const io = new IntersectionObserver((entries) => {
-        if (entries.some(e => e.isIntersecting)) {
-          fill.style.width = '100%';
-          io.disconnect();
-        }
-      }, { threshold: 0.6 });
-      io.observe(fill.parentElement);
-    })();
+    }
+    main();
   </script>
 </body>
 </html>
