@@ -28,18 +28,12 @@
          url("fonts/CooperHewitt-Heavy.woff")  format("woff");
     font-weight: 800; font-style: normal; font-display: swap;
   }
+  /* Book — the standard text weight (heavier + more legible than Light).
+     Range 100 900 so any inherited font-weight resolves to this face (no faux bold). */
   @font-face {
     font-family: "Cooper Hewitt Book";
     src: url("fonts/CooperHewitt-Book.woff2") format("woff2"),
          url("fonts/CooperHewitt-Book.woff")  format("woff");
-    font-weight: 400; font-style: normal; font-display: swap;
-  }
-  /* Light — the standard text weight across the whole sheet.
-     Range 100 900 so any inherited font-weight resolves to this face (no faux bold). */
-  @font-face {
-    font-family: "Cooper Hewitt Light";
-    src: url("fonts/CooperHewitt-Light.woff2") format("woff2"),
-         url("fonts/CooperHewitt-Light.woff")  format("woff");
     font-weight: 100 900; font-style: normal; font-display: swap;
   }
   /* Semibold — reserved for the one main title. */
@@ -59,9 +53,9 @@
     --line:  #7F9ABA;   /* hairline rules */
     --titleYellow: #db951d; /* map pin accent only */
     /* Hierarchy comes from weight, not colour: Light is standard, Semibold is the main title. */
-    --title:   "Cooper Hewitt Light", system-ui, sans-serif;
-    --display: "Cooper Hewitt Light", system-ui, sans-serif;
-    --body:    "Cooper Hewitt Light", system-ui, sans-serif;
+    --title:   "Cooper Hewitt Book", system-ui, sans-serif;
+    --display: "Cooper Hewitt Book", system-ui, sans-serif;
+    --body:    "Cooper Hewitt Book", system-ui, sans-serif;
     --main:    "Cooper Hewitt Semibold", system-ui, sans-serif;
     --bw: 1.5px;        /* datasheet hairline width */
   }
@@ -242,56 +236,88 @@
     transform: scale(1) rotateX(0deg);
   }
 
-  /* ---------- Browse button (record → rolodex) ---------- */
+  /* ---------- Browse button (record → rolodex) ----------
+     Solid, filled CTA so it obviously reads as tappable against the white sheet.
+     Fill is a darker shade of the page blue so white text stays legible. */
   .browse-btn {
     -webkit-appearance: none; appearance: none; cursor: pointer;
-    display: block; width: 100%;
-    font-family: var(--title); font-weight: 600; text-transform: uppercase;
-    letter-spacing: .16em; font-size: 11px; color: var(--ink);
-    background: var(--paper); border: none; border-top: var(--bw) solid var(--line);
-    padding: 16px; -webkit-tap-highlight-color: transparent;
+    display: flex; align-items: center; justify-content: center; gap: 11px;
+    width: 100%;
+    font-family: var(--main); font-weight: 600; text-transform: uppercase;
+    letter-spacing: .14em; font-size: 12px; color: #fff;
+    background: #556f97; border: none;
+    padding: 19px 16px calc(19px + env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color: transparent;
+    transition: background .15s ease;
   }
-  .browse-btn:active { background: #f2f5f8; }
+  .browse-btn:active { background: #45608a; }
+  .browse-btn .bicon { display: block; flex: none; }
 
   /* ---------- Rolodex: browse the tag archive ---------- */
   #rolodex {
     position: fixed; inset: 0; z-index: 400; display: none;
     touch-action: none; overscroll-behavior: contain;
     -webkit-tap-highlight-color: transparent;
+    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     perspective: 800px; perspective-origin: center top;   /* same 3D space as the intro flip */
   }
   #rolodex.active { display: block; }
-  #rolodex .rc-hint {
-    position: absolute; bottom: calc(env(safe-area-inset-bottom) + 24px); left: 0; right: 0;
-    text-align: center; pointer-events: none;
+  /* pull-zone — fills the empty map area below the card; swipe DOWN anywhere here to open.
+     Big cascading chevrons draw the eye downward. */
+  #rolodex .rc-pull {
+    position: absolute; left: 0; right: 0; bottom: 0;   /* top set in JS, just under the card */
+    display: flex; flex-direction: column; align-items: center; justify-content: space-evenly;
+    padding: clamp(24px, 6vh, 56px) 0 calc(env(safe-area-inset-bottom) + clamp(28px, 8vh, 72px));
+    color: var(--ink); touch-action: none;
   }
-  /* the deck card sits exactly where the intro tag face parks: flat, full-width, at the top,
-     with the serial in the same spot (matches .tagfoot padding + type). */
-  .rcard-face {
-    position: absolute; left: 0; right: 0; margin-inline: auto; top: 10px;
-    width: 100%; max-width: 480px;
-    background: var(--paper);
-    padding: 18px 16px 22px; will-change: transform;
-    transform-origin: center top;   /* hinge on the top edge — same point as the intro flip */
+  #rolodex .rc-pull .chev { display: block; width: clamp(88px, 34vw, 150px); height: auto; }
+  #rolodex .rc-pull .chev:nth-of-type(1) { opacity: .6; }
+  #rolodex .rc-pull .chev:nth-of-type(2) { opacity: .46; }
+  #rolodex .rc-pull .chev:nth-of-type(3) { opacity: .32; }
+  #rolodex .rc-pull .chev:nth-of-type(4) { opacity: .2; }
+  @media (prefers-reduced-motion: no-preference) {
+    #rolodex .rc-pull .chev { animation: pullwave 1.4s ease-in-out infinite; }
+    #rolodex .rc-pull .chev:nth-of-type(2) { animation-delay: .1s; }
+    #rolodex .rc-pull .chev:nth-of-type(3) { animation-delay: .2s; }
+    #rolodex .rc-pull .chev:nth-of-type(4) { animation-delay: .3s; }
   }
-  /* a card rolling in rotates down from the top edge, identical to the intro's .tf-flip */
-  .rcard-face.rc-incoming { z-index: 5; transform: scale(1.12) rotateX(62deg); }
-  .rcard-face.rc-incoming.rc-land {
-    transition: transform 340ms cubic-bezier(.22,.72,.24,1);
-    transform: scale(1) rotateX(0deg);
+  @keyframes pullwave { 0%,100% { transform: translateY(0) } 50% { transform: translateY(13px) } }
+  /* A spindle of two-sided cards hinged at the top, sitting exactly where the intro
+     tag face parks. Cards beneath peek out; the top card flips up and over the hinge,
+     showing its paper back, to reveal the next card. */
+  #rolodex .deck {
+    position: absolute; left: 0; right: 0; margin: 0 auto; top: 0;   /* flush with the top in menu mode */
+    width: 100%; max-width: 480px; height: 0;
+    transform-style: preserve-3d;
   }
-  .rcard-face .lbl { display: block; margin-bottom: 9px; }
-  .rcard-face .rc-serial {
+  .rcard {
+    position: absolute; top: 0; left: 0; width: 100%;
+    transform-origin: center top; transform-style: preserve-3d;
+    will-change: transform;
+  }
+  .rcard .face {
+    position: absolute; inset: 0; backface-visibility: hidden;
+    background: var(--paper); padding: 18px 16px 22px;
+  }
+  .rcard .face.front { position: relative; }   /* gives the card its height */
+  .rcard .face.back {
+    transform: rotateX(180deg);                 /* the underside of the paper */
+    display: flex; align-items: center; justify-content: center;
+    border-top: var(--bw) solid var(--line);
+  }
+  .rcard .face.back .rc-bar { width: 60%; opacity: .45; margin: 0; }
+  .rcard .lbl { display: block; margin-bottom: 9px; }
+  .rcard .rc-serial {
     font-family: var(--main); font-weight: 600;
     font-size: clamp(30px, 9.5vw, 44px); letter-spacing: .005em;
     font-variant-numeric: tabular-nums; line-height: 1.05; margin: 0;
   }
-  .rcard-face .rc-bar { display: block; width: 66%; max-width: 260px; height: 30px; margin-top: 12px; fill: #5b7aa8; }
-  .rcard-face .rc-name {
+  .rcard .rc-bar { display: block; width: 66%; max-width: 260px; height: 30px; margin-top: 12px; fill: #5b7aa8; }
+  .rcard .rc-name {
     font-family: var(--main); font-weight: 600; font-size: 15px;
     line-height: 1.22; margin-top: 16px;
   }
-  .rcard-face .rc-city { font-size: 12.5px; margin-top: 3px; color: var(--ink); }
+  .rcard .rc-city { font-size: 12.5px; margin-top: 3px; color: var(--ink); }
 
   /* ---------- Construction tag ---------- */
   .specs { border-bottom: var(--bw) solid var(--line); }
@@ -438,7 +464,13 @@
         <span class="lbl">Made in the USA</span>
       </footer>
 
-      <button class="browse-btn" id="browseBtn">Browse the tag archive ↑</button>
+      <button class="browse-btn" id="browseBtn">
+        <svg class="bicon" width="19" height="17" viewBox="0 0 20 18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="1" y="5.5" width="13" height="11.5" rx="2"/>
+          <path d="M5 5.5V3.5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1.5"/>
+        </svg>
+        <span>Browse the archive</span>
+      </button>
 
       <!-- Bottom of the tag: the scanned serial. The rolodex flip resolves right here. -->
       <section class="tagfoot" id="tagfoot">
@@ -455,8 +487,14 @@
 
   <!-- Rolodex: browse the tag archive; swipe up to flip, pull a card down to open -->
   <div id="rolodex" aria-hidden="true">
-    <div class="rcard-face" id="deckCard"></div>
-    <div class="rc-hint"><span class="lbl"><span id="deckCount"></span> · swipe up to flip · pull a card down to open</span></div>
+    <div class="deck" id="deck"></div>
+    <!-- pull-zone: swipe DOWN anywhere here to drag the card open (no taps) -->
+    <div class="rc-pull" id="deckPull">
+      <svg class="chev" viewBox="0 0 48 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l21 16 21-16"/></svg>
+      <svg class="chev" viewBox="0 0 48 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l21 16 21-16"/></svg>
+      <svg class="chev" viewBox="0 0 48 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l21 16 21-16"/></svg>
+      <svg class="chev" viewBox="0 0 48 22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l21 16 21-16"/></svg>
+    </div>
   </div>
 
   <script>
@@ -759,7 +797,11 @@
     let introSkipped = false;
     async function playIntro(){
       document.body.classList.add('intro-lock');
-      if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+      // never let a stalled font load block the intro — the sheet is parked off-screen
+      // until after this, so a hang here would leave the page looking blank.
+      try {
+        if (document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready, sleep(600)]);
+      } catch (e) {}
       const GAP = 10;
       shell.classList.remove('offstage');
       const parkY = -(tagfoot.offsetTop - GAP);
@@ -788,8 +830,8 @@
 
     /* ======================= rolodex browsing loop ======================= */
     const rolodex  = document.getElementById('rolodex');
-    const deckCard = document.getElementById('deckCard');
-    const deckCount = document.getElementById('deckCount');
+    const deckEl   = document.getElementById('deck');
+    const deckPull = document.getElementById('deckPull');
     let mode = 'record';       // 'record' | 'rolodex'
     let deckIndex = 0;
 
@@ -802,50 +844,107 @@
       map.invalidateSize();
     }
 
-    function deckCardHTML(r, d){
+    function deckFaceHTML(r, d){
       return `<span class="lbl">Board Serial No.</span>
               <div class="rc-serial">${d.boardSerial}</div>
               <svg class="rc-bar" viewBox="0 0 320 40" preserveAspectRatio="none" aria-hidden="true">${barcodeBars()}</svg>
               <div class="rc-name">${r.name}</div>
               <div class="rc-city">${r.city}, ${r.state}</div>`;
     }
-    function setDeckContent(i){
-      const r = RECORDS[i], d = deriveSpecs(r);
-      deckCard.innerHTML = deckCardHTML(r, d);
-      deckCount.textContent = `${String(i+1).padStart(2,'0')} / ${String(RECORDS.length).padStart(2,'0')}`;
-    }
-    function deckRest(){
-      deckCard.style.transition = 'none';
-      deckCard.style.transform = 'translateY(0px)';
-    }
-    function showDeckCard(i){ setDeckContent(i); deckRest(); }
 
-    // Flip to card i using the SAME roll-down as the intro: a clone rotates down from the
-    // top hinge and covers the current card — coherent with the opening animation.
-    let deckBusy = false;
-    function deckRollTo(i){
-      deckBusy = true;
-      const r = RECORDS[i], d = deriveSpecs(r);
-      const nc = document.createElement('div');
-      nc.className = 'rcard-face rc-incoming';
-      nc.innerHTML = deckCardHTML(r, d);
-      rolodex.appendChild(nc);
-      requestAnimationFrame(() => requestAnimationFrame(() => nc.classList.add('rc-land')));
-      setTimeout(() => {
-        deckIndex = i;
-        setDeckContent(i);
-        deckRest();
-        nc.remove();
-        deckBusy = false;
-      }, 340);
+    /* Rolodex carousel: `pos` is a continuous scroll position; an integer means that card
+       lies flat on top. Cards with a higher index peek out beneath; the flipping card
+       rotates from 0° up to −180° over the top hinge (showing its paper back) to reveal
+       the next card underneath. Fully bidirectional. */
+    const DECK_N = 5;                 // pooled card nodes (a window around pos)
+    const deckPool = [];
+    const OPEN_COMMIT = 150;  // px of pull-down that commits to opening the record
+    let pos = 0;
+    let openPull = null;      // { parkY } while a pull-to-open reveal is in progress
+    let deckAnimating = false;
+
+    function buildDeckPool(){
+      deckEl.innerHTML = '';
+      deckPool.length = 0;
+      for (let k = 0; k < DECK_N; k++){
+        const c = document.createElement('div');
+        c.className = 'rcard';
+        c.innerHTML = `<div class="face front"></div>
+          <div class="face back"><svg class="rc-bar" viewBox="0 0 320 40" preserveAspectRatio="none" aria-hidden="true">${barcodeBars()}</svg></div>`;
+        deckEl.appendChild(c);
+        deckPool.push({ el: c, front: c.querySelector('.front'), idx: null });
+      }
     }
-    function deckAdvance(){
-      deckRest();                                    // current snaps flat, hidden under the incoming
-      deckRollTo((deckIndex + 1) % RECORDS.length);
+    function fillSlot(slot, recIdx){
+      if (slot.idx === recIdx) return;
+      slot.idx = recIdx;
+      const r = RECORDS[recIdx], d = deriveSpecs(r);
+      slot.front.innerHTML = deckFaceHTML(r, d);
     }
-    function deckSnapBack(){
-      deckCard.style.transition = 'transform .25s ease';
-      deckCard.style.transform = 'translateY(0px)';
+    /* Stacked-card slide — the motion from the Spotify feature-card reference: the top
+       card holds position, then slides up and PAST the deck while the next card rises
+       out of the stack beneath it, so the cards overlap and pass each other.
+       FLIP_DEG > 0 reintroduces a paper flip on the outgoing card if you want it back. */
+    const STACK_GAP = 14;     // px of edge each waiting card shows beneath the top one
+    const STACK_DEPTH = 18;   // px each waiting card recedes in 3D
+    const SLIDE_EXTRA = 28;   // extra travel so a leaving card fully clears the deck
+    const FLIP_DEG = 0;       // 0 = pure slide; >0 tilts the leaving card like paper
+    let cardH = 0, deckTravel = 240;
+
+    const wrap = i => { const n = RECORDS.length; return ((i % n) + n) % n; };  // endless loop
+
+    function layoutDeck(){
+      const start = Math.floor(pos) - 1;
+
+      // pass 1 — assign records (wrapped, so the deck loops) to the pooled nodes
+      const items = [];
+      for (let k = 0; k < DECK_N; k++){
+        const i = start + k, slot = deckPool[k];
+        slot.el.style.display = '';
+        fillSlot(slot, wrap(i));
+        items.push({ slot, i });
+      }
+      // only lock in a REAL measurement (0 while the deck is still hidden)
+      if (!cardH){
+        const h = items[0] ? items[0].slot.el.offsetHeight : 0;
+        if (h) cardH = h;
+      }
+      deckTravel = (cardH || 190) + SLIDE_EXTRA;
+
+      // pass 2 — waiting cards sit in a TIGHT stack (just an edge showing, never a row);
+      // the leaving card lifts up and slides past them, which is the motion that reads.
+      for (const it of items){
+        const rel = it.i - pos;      // 0 = on top, <0 = lifting away, >0 = waiting beneath
+        let ty, tz, rx = 0;
+        if (rel <= 0){               // lifting up and off the top of the deck
+          ty = rel * deckTravel;
+          tz = 0;
+          rx = FLIP_DEG * -rel;
+        } else {                     // stacked just beneath, showing a sliver of its edge
+          ty = rel * STACK_GAP;
+          tz = -rel * STACK_DEPTH;
+        }
+        it.slot.el.style.opacity = '1';
+        it.slot.el.style.zIndex = String(300 - Math.round(rel * 10));  // leaving card passes over
+        it.slot.el.style.transform =
+          `translate3d(0, ${ty}px, ${tz}px)` + (rx ? ` rotateX(${rx}deg)` : '');
+      }
+
+      // park the pull-zone just under the card (deck is flush at top: 0)
+      if (deckPull) deckPull.style.top = ((cardH || 190) + 14) + 'px';
+
+      deckIndex = wrap(Math.round(pos));
+    }
+    function animatePosTo(target){
+      const startP = pos, t0 = performance.now(), dur = 320;
+      deckAnimating = true;
+      (function step(now){
+        const p = Math.min(1, (now - t0) / dur);
+        pos = startP + (target - startP) * (1 - Math.pow(1 - p, 3));
+        layoutDeck();
+        if (p < 1) requestAnimationFrame(step);
+        else { pos = target; deckAnimating = false; layoutDeck(); }
+      })(performance.now());
     }
 
     // record → rolodex: push the tag up, zoom the map back out, reveal the deck
@@ -858,52 +957,104 @@
       shell.style.transition = 'transform .6s cubic-bezier(.5,0,.2,1)';
       shell.style.transform = 'translateY(-100%)';
       deckIndex = CURRENT_IDX;
-      showDeckCard(deckIndex);
-      rolodex.classList.add('active');
+      pos = CURRENT_IDX;
+      openPull = null;
+      rolodex.classList.add('active');           // make it visible FIRST, so cards can be measured
       rolodex.setAttribute('aria-hidden', 'false');
+      buildDeckPool();
+      cardH = 0;                                 // re-measure now that the deck is laid out
+      layoutDeck();
     }
 
-    // rolodex → record: zoom into the picked site, slide the tag back down to frame it
-    async function openRecord(i){
-      if (mode !== 'rolodex') return;
-      mode = 'record';
-      rolodex.classList.remove('active');
-      rolodex.setAttribute('aria-hidden', 'true');
-      renderRecord(RECORDS[i], i);
-      await flyTo(SITE, 15, 2.4);
-      const parkY = -(tagfoot.offsetTop - 10);
+    /* rolodex → record, driven BY the pull. Grabbing the pull-zone and dragging down
+       physically slides the whole record sheet down into view (revealing the full card),
+       replacing the automatic slide-down. The map zooms into the site as you pull. */
+    function beginOpenPull(){
+      window.scrollTo(0, 0);                            // the parking math assumes scrollY = 0
+      renderRecord(RECORDS[deckIndex], deckIndex);      // sheet's tag face == the deck card
+      openPull = { parkY: -tagfoot.offsetTop };         // flush at top, matching the deck card; measure AFTER render
       shell.style.transition = 'none';
-      shell.style.transform = `translateY(${parkY}px)`;
+      shell.style.transform = `translateY(${openPull.parkY}px)`;   // parked: tag face at the top
       void shell.offsetWidth;
-      alignMapToSlot(parkY);
-      await slideShellTo(0, 2200);
-      dockMap();
+      deckEl.style.transition = 'opacity .2s ease'; deckEl.style.opacity = '0';
+      if (deckPull){ deckPull.style.transition = 'opacity .2s ease'; deckPull.style.opacity = '0'; }
+      flyTo(SITE, 15, 2.2);                             // zoom in while it's pulled
+    }
+    function moveOpenPull(dy){
+      // finger drags the sheet from parked (tag only) down toward 0 (full record framed)
+      const y = Math.max(openPull.parkY, Math.min(0, openPull.parkY + dy));
+      shell.style.transform = `translateY(${y}px)`;
+    }
+    async function endOpenPull(commit){
+      const parkY = openPull.parkY; openPull = null;
+      if (commit){
+        mode = 'record';
+        rolodex.classList.remove('active');
+        rolodex.setAttribute('aria-hidden', 'true');
+        await slideShellTo(0, 480);                     // finish the reveal
+        window.scrollTo(0, 0);                          // record shows from the top, not mid-scroll
+        alignMapToSlot(0);
+        dockMap();
+        deckEl.style.transition = ''; deckEl.style.opacity = '';
+        if (deckPull){ deckPull.style.transition = ''; deckPull.style.opacity = ''; }
+      } else {
+        // not far enough — throw the sheet back off the top and stay in the rolodex
+        shell.style.transition = 'transform .3s ease';
+        shell.style.transform = 'translateY(-100%)';
+        deckEl.style.opacity = ''; if (deckPull) deckPull.style.opacity = '';
+        flyTo(US, 4, 1.0);
+      }
     }
 
-    // touch-first deck gestures: swipe up = next, pull a card down = open, tap = open
+    /* Swipe-only, contextual by where the swipe STARTS. Nothing responds to a tap.
+         · on the deck / card  → swipe up or down to flip through the archive
+         · on the pull-zone    → swipe down to physically drag the card open        */
     let dg = null;
     rolodex.addEventListener('pointerdown', e => {
-      if (mode !== 'rolodex' || deckBusy) return;
-      dg = { y: e.clientY, t: e.timeStamp, dy: 0 };
-      deckCard.style.transition = 'none';
+      if (mode !== 'rolodex' || deckAnimating) return;
+      dg = {
+        y: e.clientY, t: e.timeStamp, dy: 0, pos0: pos,
+        pulling: !!e.target.closest('.rc-pull'), moved: false,
+      };
       try { rolodex.setPointerCapture(e.pointerId); } catch (x) {}
     });
     rolodex.addEventListener('pointermove', e => {
       if (!dg) return;
       dg.dy = e.clientY - dg.y;
-      // follow the finger down; resist upward past the hinge so the flip feels weighted
-      const y = dg.dy < 0 ? dg.dy * 0.6 : dg.dy;
-      deckCard.style.transform = `translateY(${y}px)`;
+      if (Math.abs(dg.dy) > 5) dg.moved = true;
+      if (dg.pulling){
+        if (dg.dy > 4){                            // pull-zone is a downward gesture only
+          if (!openPull) beginOpenPull();          // lazily start on first real pull
+          moveOpenPull(dg.dy);
+        }
+      } else {
+        pos = dg.pos0 - dg.dy / deckTravel;   // 1:1 flip; up → next, down → prev (loops endlessly)
+        layoutDeck();
+      }
     });
     rolodex.addEventListener('pointerup', e => {
       if (!dg) return;
-      const { dy, t } = dg; dg = null;
-      const dt = e.timeStamp - t, vel = dy / Math.max(dt, 1);
-      if (dy < -48 || vel < -0.5) deckAdvance();            // swipe up → next (rolls down like the intro)
-      else if (dy > 96 || vel > 0.7) openRecord(deckIndex); // deliberate pull down → open
-      else deckSnapBack();                                   // anything short (incl. a stray tap) → nothing
+      const g = dg; dg = null;
+      if (g.pulling){
+        if (openPull){
+          const dt = e.timeStamp - g.t, vel = g.dy / Math.max(dt, 1);
+          endOpenPull(g.dy > OPEN_COMMIT || vel > 0.6);   // far/fast enough → open, else spring back
+        }
+        return;
+      }
+      if (!g.moved) return;                        // a tap does nothing, anywhere
+      const dt = e.timeStamp - g.t, vel = g.dy / Math.max(dt, 1);
+      let target = Math.round(pos);
+      if (vel < -0.5) target = Math.floor(pos) + 1;      // flick up → next
+      else if (vel > 0.5) target = Math.ceil(pos) - 1;   // flick down → previous
+      animatePosTo(target);
     });
-    rolodex.addEventListener('pointercancel', () => { if (dg) { dg = null; deckSnapBack(); } });
+    rolodex.addEventListener('pointercancel', () => {
+      if (!dg) return;
+      const wasPulling = dg.pulling; dg = null;
+      if (wasPulling){ if (openPull) endOpenPull(false); }
+      else animatePosTo(Math.round(pos));
+    });
 
     document.getElementById('browseBtn').addEventListener('click', enterRolodex);
 
